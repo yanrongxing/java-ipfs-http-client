@@ -7,7 +7,9 @@ import io.ipfs.multiaddr.MultiAddress;
 import org.junit.*;
 
 import java.io.*;
+import java.net.URLEncoder;
 import java.nio.file.*;
+import java.rmi.ServerException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
@@ -80,8 +82,46 @@ public class APITest {
 
     @Test
     public void singleFileTest() throws IOException {
-        NamedStreamable.ByteArrayWrapper file = new NamedStreamable.ByteArrayWrapper("hello.txt", "G'day world! IPFS rocks!".getBytes());
-        fileTest(file);
+        String id = "4";
+        String version = "2";
+        String address = "0x0b96d89854acdb0373a1a761bb6071d13e4f7be5";
+        String jsonStr = "{\n" +
+                "  \"name\": \"Spacecraft #0\",\n" +
+                "  \"image\": \"ipfs://QmYsH2XxgK16ibfG8GZZDkiPnQDTorxSVK38nLDY7t8HUS/Elemental.gif\",\n" +
+                "  \"attributes\": [\n" +
+                "    {\n" +
+                "      \"trait_type\": \"Vessel\",\n" +
+                "      \"value\": \"Dropship\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"trait_type\": \"Craft Type\",\n" +
+                "      \"value\": \"Elemental\"\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+        String folder = "/"+address+"/"+id+"/";
+
+
+        String fileName = version+".json";
+        String filePath = "/"+address+"/"+id+"/"+fileName;
+        String folderHash = null;
+        Map<String, Object> stat= null;
+        try{
+            stat = ipfs.file.stat(URLEncoder.encode(folder, "UTF-8"));
+            folderHash = stat.get("Hash").toString();
+        }catch (Exception exception){
+            if(exception.getCause() instanceof IOException){
+                ipfs.file.mkdir(folder);
+                stat = ipfs.file.stat(URLEncoder.encode(folder, "UTF-8"));
+                folderHash = stat.get("Hash").toString();
+            }
+        }
+        NamedStreamable.ByteArrayWrapper file = new NamedStreamable.ByteArrayWrapper(fileName, jsonStr.getBytes());
+        List<MerkleNode> add = ipfs.add(file);
+        Multihash hash = add.get(0).hash;
+        ipfs.file.cp(URLEncoder.encode("/ipfs/", "UTF-8")+hash.toString(),URLEncoder.encode( filePath, "UTF-8"));
+
+        System.out.println(folderHash+"/"+fileName);
     }
 
     @Test
@@ -102,14 +142,21 @@ public class APITest {
 
     @Test
     public void dirTest() throws IOException {
-        Path test = Files.createTempDirectory("test");
-        Files.write(test.resolve("file.txt"), "G'day IPFS!".getBytes());
+        Path test = Files.createTempDirectory("test2");
+        Files.write(test.resolve("file1.txt"), "G'day IPFS!".getBytes());
         NamedStreamable dir = new NamedStreamable.FileWrapper(test.toFile());
         List<MerkleNode> add = ipfs.add(dir);
         MerkleNode addResult = add.get(add.size() - 1);
         List<MerkleNode> ls = ipfs.ls(addResult.hash);
         Assert.assertTrue(ls.size() > 0);
     }
+
+    @Test
+    public void fileCp() throws IOException {
+        ipfs.file.cp(URLEncoder.encode("/ipfs/", "UTF-8")+"QmXK5mQXxJU4rAntyrFoefEcRGgyZckJGDJX9ggL19NXQL",URLEncoder.encode("/test/3", "UTF-8"));
+        Object gc = ipfs.repo.gc();
+    }
+
 
     @Test
     public void directoryTest() throws IOException {
@@ -207,14 +254,11 @@ public class APITest {
 
     public void fileTest(NamedStreamable file)  throws IOException{
         MerkleNode addResult = ipfs.add(file).get(0);
-        byte[] catResult = ipfs.cat(addResult.hash);
-        byte[] getResult = ipfs.get(addResult.hash);
-        if (!Arrays.equals(catResult, file.getContents()))
-            throw new IllegalStateException("Different contents!");
-        List<Multihash> pinRm = ipfs.pin.rm(addResult.hash, true);
-        if (!pinRm.get(0).equals(addResult.hash))
-            throw new IllegalStateException("Didn't remove file!");
+        Multihash hash = addResult.hash;
+
+        ipfs.file.cp(URLEncoder.encode("/ipfs/", "UTF-8")+hash.toString(),URLEncoder.encode("/test/1/", "UTF-8")+file.getName().get());
         Object gc = ipfs.repo.gc();
+
     }
 
     @Test
@@ -364,7 +408,7 @@ public class APITest {
         List<MerkleNode> newPointer2 = ipfs.object.put("json", Arrays.asList(object.toJSONString().getBytes()));
         MerkleNode links = ipfs.object.links(pointer);
         byte[] data = ipfs.object.data(pointer);
-        Map stat = ipfs.object.stat(pointer);
+//        Map stat = ipfs.object.stat(pointer);
     }
 
     @Test

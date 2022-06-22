@@ -374,7 +374,7 @@ public class IPFS {
             return MerkleNode.fromJSON(json);
         }
 
-        public Map<String, Object> stat(Multihash hash) throws IOException {
+        public Map<String, Object> stat(String hash) throws IOException {
             return retrieveMap("object/stat?stream-channels=true&arg=" + hash);
         }
 
@@ -462,7 +462,17 @@ public class IPFS {
 
     public class File {
         public Map ls(Multihash path) throws IOException {
-            return retrieveMap("file/ls?arg=" + path);
+            return retrieveMap("files/ls?arg=" + path);
+        }
+        public Map cp(String source,String dest) throws IOException {
+            return retrieveMap("files/cp?arg=" +source+"&arg="+dest+"&stream-channels=true&parents=true");
+        }
+        public Map<String, Object> stat(String hash) throws IOException {
+            return IPFS.this.retrieveMap("files/stat?stream-channels=true&arg=" + hash);
+        }
+
+        public Map mkdir(String dir) throws IOException {
+            return retrieveMap("files/mkdir?arg=" +dir+"&stream-channels=true&parents=true");
         }
     }
 
